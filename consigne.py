@@ -1,136 +1,91 @@
 import streamlit as st
 import pandas as pd
-from datetime import datetime, time, timedelta
+from datetime import datetime, timedelta, time
 import altair as alt
 import io
-import locale
-import re
 
-st.set_page_config(page_title="Analyse des Heures", layout="wide")
-st.title("🕒 Analyse des heures de travail - Coller depuis Excel (format FR)")
+st.title("Calcul des heures travaillées")
 
-text_input = st.text_area(
-    "📋 Collez ici le tableau depuis Excel :",
-    height=350,
-    help="Collez les données avec entêtes (colonnes : Date, Début, Fin, Pause non payée, Total (h), Notes du superviseur)"
-)
+input_text = st.text_area("Collez ici votre tableau (copié depuis Excel)", height=300)
 
-def parse_french_date(text):
+if input_text:
     try:
-        clean = re.sub(r"^\w+\s", "", text)  # Supprime "lundi ", "mardi ", etc.
-        return datetime.strptime(clean, "%d %B %Y")
-    except Exception:
-        return pd.NaT
+        df = pd.read_csv(io.StringIO(input_text), sep="\t")
 
-def parse_datetime(date_str, hour_str):
-    if pd.isna(date_str) or pd.isna(hour_str):
-        return None
-    try:
-        hour_str = str(hour_str).replace(',', '.')
-        h, m = map(int, hour_str.split(":"))
-        date_obj = parse_french_date(date_str)
-        return datetime.combine(date_obj.date(), time(h, m))
-    except:
-        return None
+        # Nettoyage & conversion des colonnes
+        df['Date'] = pd.to_datetime(df['Date'], format="%A %d %B %Y", errors='coerce')
+        df['Début'] = pd.to_datetime(df['Début'], format="%H:%M").dt.time
+        df['Fin'] = pd.to_datetime(df['Fin'], format="%H:%M").dt.time
+        df['Pause non payée'] = df['Pause non payée'].astype(str).str.replace(",", ".").astype(float)
+        df['Total (h)'] = df['Total (h)'].astype(str).str.replace(",", ".").astype(float)
+        df['Notes du superviseur'] = df['Notes du superviseur'].fillna('').astype(str)
 
-def calculate_hours(start, end):
-    if pd.isna(start) or pd.isna(end):
-        return 0, 0, 0
+        # Résultats cumulés
+        total_jours = 0
+        total_heure_jour = 0.0
+        total_heure_nuit = 0.0
+        total_heure_dimanche = 0.0
+        total_heure_sup = 0.0
 
-    if end <= start:
-        end += timedelta(days=1)
+        # Heures seuils
+        heure_nuit_debut = time(21, 0)
+        heure_nuit_fin = time(6, 0)
 
-    total_day = timedelta()
-    total_night = timedelta()
-    total_sunday = timedelta()
+        for _, row in df.iterrows():
+            if pd.isna(row['Date']):
+                continue
 
-    current = start
-    while current < end:
-        next_step = min(end, current + timedelta(minutes=1))
-        if current.weekday() == 6:
-            total_sunday += (next_step - current)
+            debut_datetime = datetime.combine(row['Date'], row['Début'])
+            fin_datetime = datetime.combine(row['Date'] + timedelta(days=1) if row['Fin'] < row['Début'] else row['Date'], row['Fin'])
+            duree_totale = (fin_datetime - debut_datetime).total_seconds() / 3600
+            duree_travail = duree_totale - row['Pause non payée']
 
-        if time(6, 0) <= current.time() < time(21, 0):
-            total_day += (next_step - current)
-        else:
-            total_night += (next_step - current)
+            heure_sup = 0
+            if 'renfort' in row['Notes du superviseur'].lower():
+                heure_sup = duree_travail
+                total_heure_sup += heure_sup
+                continue  # On saute le reste du calcul pour ne pas les inclure dans jour/nuit
 
-        current = next_step
+            total_jours += 1
 
-    return total_day.total_seconds() / 3600, total_night.total_seconds() / 3600, total_sunday.total_seconds() / 3600
+            current_time = debut_datetime
+            while current_time < fin_datetime:
+                next_time = current_time + timedelta(minutes=15)
+                segment_heure = (next_time - current_time).total_seconds() / 3600
+                jour_semaine = current_time.weekday()
 
-if text_input:
-    try:
-        sep = "\t" if "\t" in text_input else ";"
-        df = pd.read_csv(io.StringIO(text_input), sep=sep)
+                if jour_semaine == 6:
+                    total_heure_dimanche += segment_heure
+                elif jour_semaine == 5 and current_time.hour < 6:
+                    total_heure_dimanche += segment_heure
+                elif heure_nuit_fin <= current_time.time() < heure_nuit_debut:
+                    total_heure_jour += segment_heure
+                else:
+                    total_heure_nuit += segment_heure
 
-        # Convertir noms de colonnes en uniformes
-        df.columns = [col.strip() for col in df.columns]
+                current_time = next_time
 
-        # Normaliser les colonnes avec noms exacts
-        expected_cols = ["Date", "Début", "Fin", "Pause non payée", "Total (h)", "Notes du superviseur"]
-        if not all(col in df.columns for col in expected_cols):
-            st.error("❌ Veuillez inclure toutes les colonnes attendues : " + ", ".join(expected_cols))
-        else:
-            summary = {
-                "Jours travaillés": 0,
-                "Heures de Jour": 0,
-                "Heures de Nuit": 0,
-                "Heures de Dimanche": 0,
-                "Heures Sup. Renfort": 0,
-            }
+        # Affichage des résultats
+        st.subheader("Résultat global")
+        st.markdown(f"- **Nombre de jours travaillés** : {total_jours}")
+        st.markdown(f"- **Heures de jour** : {round(total_heure_jour, 2)} h")
+        st.markdown(f"- **Heures de nuit** : {round(total_heure_nuit, 2)} h")
+        st.markdown(f"- **Heures de dimanche** : {round(total_heure_dimanche, 2)} h")
+        st.markdown(f"- **Heures supplémentaires (renfort)** : {round(total_heure_sup, 2)} h")
 
-            details = []
-
-            for _, row in df.iterrows():
-                date_str = row["Date"]
-                debut = parse_datetime(date_str, row["Début"])
-                fin = parse_datetime(date_str, row["Fin"])
-                pause = float(str(row["Pause non payée"]).replace(',', '.')) if not pd.isna(row["Pause non payée"]) else 0
-                total_h = float(str(row["Total (h)"]).replace(',', '.')) if not pd.isna(row["Total (h)"]) else 0
-                notes = str(row.get("Notes du superviseur", "")).lower()
-
-                if pd.notna(debut) and pd.notna(fin):
-                    summary["Jours travaillés"] += 1
-                    jour, nuit, dimanche = calculate_hours(debut, fin)
-                    jour -= pause
-
-                    summary["Heures de Jour"] += max(jour, 0)
-                    summary["Heures de Nuit"] += max(nuit, 0)
-                    summary["Heures de Dimanche"] += max(dimanche, 0)
-
-                    if "renfort" in notes:
-                        summary["Heures Sup. Renfort"] += total_h
-
-                    details.append({
-                        "Date": parse_french_date(date_str).date(),
-                        "Heures de Jour": round(jour, 2),
-                        "Heures de Nuit": round(nuit, 2),
-                        "Heures de Dimanche": round(dimanche, 2),
-                        "Heures Sup. Renfort": round(total_h if "renfort" in notes else 0, 2)
-                    })
-
-            st.subheader("🧾 Résumé global")
-            st.write(pd.DataFrame([summary]))
-
-            st.subheader("📈 Visualisation graphique")
-            details_df = pd.DataFrame(details)
-
-            melted = details_df.melt(
-                id_vars="Date",
-                value_vars=["Heures de Jour", "Heures de Nuit", "Heures de Dimanche", "Heures Sup. Renfort"],
-                var_name="Type d'heure",
-                value_name="Durée (h)"
-            )
-
-            chart = alt.Chart(melted).mark_bar().encode(
-                x='Date:T',
-                y='Durée (h):Q',
-                color='Type d\'heure:N',
-                tooltip=['Date:T', 'Type d\'heure:N', 'Durée (h):Q']
-            ).properties(width=800, height=400).interactive()
-
-            st.altair_chart(chart, use_container_width=True)
+        # Graphique
+        st.subheader("Visualisation")
+        chart_df = pd.DataFrame({
+            "Type": ["Jour", "Nuit", "Dimanche", "Supplémentaire"],
+            "Heures": [total_heure_jour, total_heure_nuit, total_heure_dimanche, total_heure_sup]
+        })
+        chart = alt.Chart(chart_df).mark_bar().encode(
+            x="Type",
+            y="Heures",
+            color="Type",
+            tooltip=["Type", "Heures"]
+        ).properties(width=600)
+        st.altair_chart(chart)
 
     except Exception as e:
-        st.error(f"❌ Erreur lors du traitement : {e}")
+        st.error(f"Erreur lors du traitement : {e}")
