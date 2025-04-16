@@ -64,14 +64,14 @@ if input_text:
         return pd.Series([heures_jour, heures_nuit, heures_dimanche, 0])
 
     df[['Heures jour', 'Heures nuit', 'Heures dimanche', 'Heures supp']] = df.apply(calculate_hours, axis=1)
-    jours_travaillés = df[~df['Notes du superviseur'].str.contains('renfort')]['Date'].nunique()
+    jours_travaillés = df['Date'].nunique()
 
     # Résumés
     total_jour = df['Heures jour'].sum()
     total_nuit = df['Heures nuit'].sum()
     total_dimanche = df['Heures dimanche'].sum()
     total_renfort = df['Heures supp'].sum()
-
+    
     # Résultat global
     st.header("Résultat global")
     st.write(f"**Nombre de jours travaillés :** {jours_travaillés}")
@@ -79,6 +79,7 @@ if input_text:
     st.write(f"**Heures de nuit :** {total_nuit:.2f} h")
     st.write(f"**Heures de dimanche :** {total_dimanche:.2f} h")
     st.write(f"**Heures supplémentaires (renfort) :** {total_renfort:.2f} h")
+    st.write(f"**Total Heures calculés : ** {total_jour + total_nuit + total_dimanche + total_renfort:.2f} h")
 
     # Visualisation
     st.header("Visualisation")
