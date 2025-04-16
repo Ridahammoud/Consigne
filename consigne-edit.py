@@ -101,7 +101,7 @@ if input_text:
     plt.title("Répartition des heures par jour")
     st.pyplot(fig)
 
-    # Détails
-    st.header("Détail par ligne")
+    # Détails 
+    st.header("Détail de Calcul par ligne")
     st.dataframe(df[['Date', 'Heures jour', 'Heures nuit', 'Heures dimanche', 'Heures supp']])
 
