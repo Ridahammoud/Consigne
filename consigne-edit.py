@@ -81,6 +81,10 @@ if input_text:
     st.write(f"**Heures supplémentaires (renfort) :** {total_renfort:.2f} h")
     st.write(f"**Total Heures calculés :** {total_jour + total_nuit + total_dimanche + total_renfort:.2f} h")
 
+    # Notes du superviseur
+    st.header("Notes du superviseur")
+    st.write(f"**Les notes des superviseurs :** {df['Notes du superviseur']} ")
+
     # Visualisation
     st.header("Visualisation")
     fig, ax = plt.subplots(figsize=(10, 5))
