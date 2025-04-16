@@ -78,12 +78,12 @@ if input_text:
     st.write(f"**Heures de jour :** {total_jour:.2f} h")
     st.write(f"**Heures de nuit :** {total_nuit:.2f} h")
     st.write(f"**Heures de dimanche :** {total_dimanche:.2f} h")
-    st.write(f"**Heures supplémentaires (renfort) :** {total_renfort:.2f} h")
+    st.write(f"**Heures supplémentaires (renfort) :** {total_renfort - df[df['Notes du superviseur'].str.contains('renfort')]['Date'].nunique() :.2f} h")
     st.write(f"**Total Heures calculés :** {total_jour + total_nuit + total_dimanche + total_renfort:.2f} h")
 
     # Notes du superviseur
     st.header("Notes du superviseur")
-    st.write(f"**Les notes des superviseurs :** {df['Notes du superviseur']} ")
+    st.write(f"**Les notes des superviseurs :** {df[~df['Notes du superviseur'].isnull()][['Date','Notes du superviseur']]} ")
 
     # Visualisation
     st.header("Visualisation")
