@@ -79,7 +79,7 @@ if input_text:
     st.write(f"**Heures de nuit :** {total_nuit:.2f} h")
     st.write(f"**Heures de dimanche :** {total_dimanche:.2f} h")
     st.write(f"**Heures supplémentaires (renfort) :** {total_renfort:.2f} h")
-    st.write(f"**Total Heures calculés : ** {total_jour + total_nuit + total_dimanche + total_renfort:.2f} h")
+    st.write(f"**Total Heures calculés :** {total_jour + total_nuit + total_dimanche + total_renfort:.2f} h")
 
     # Visualisation
     st.header("Visualisation")
