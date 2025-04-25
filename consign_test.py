@@ -30,7 +30,7 @@ if input_text:
     JOUR_START = 6
     JOUR_END = 21
 
-    # Fonctions de calcul
+    # Fonction de calcul par ligne
     def calculate_hours(row):
         date = row['Date']
         start = datetime.combine(date, row['Début'])
@@ -62,19 +62,35 @@ if input_text:
 
             current = next_minute
 
-        if is_supp_05:
-            if df['Heures nuit']>0:
-                df['Heures nuit'] = df['Heures nuit'] - 0.5
-                df['Heures supp']+= 0.5
-            else:
-                df['Heures jour'] = df['Heures jour'] - 0.5
-                df['Heures supp']+= 0.5
-
         # Retirer pause des heures de jour
         pause = row['Pause non payée']
         heures_jour = max(0, heures_jour - pause)
 
-        return pd.Series([heures_jour, heures_nuit, heures_dimanche, 0])
+        # Gestion des heures supplémentaires manuelles
+        supp_hours = 0
+        for val, amount in [
+            (is_supp_25, 2.5),
+            (is_supp_2, 2.0),
+            (is_supp_15, 1.5),
+            (is_supp_1, 1.0),
+            (is_supp_05, 0.5),
+        ]:
+            if val:
+                if heures_nuit >= amount:
+                    heures_nuit -= amount
+                elif heures_jour >= amount:
+                    heures_jour -= amount
+                else:
+                    deducted = min(heures_jour + heures_nuit, amount)
+                    if heures_nuit >= deducted:
+                        heures_nuit -= deducted
+                    else:
+                        deducted_nuit = heures_nuit
+                        heures_nuit = 0
+                        heures_jour = max(0, heures_jour - (amount - deducted_nuit))
+                supp_hours += amount
+
+        return pd.Series([heures_jour, heures_nuit, heures_dimanche, supp_hours])
 
     df[['Heures jour', 'Heures nuit', 'Heures dimanche', 'Heures supp']] = df.apply(calculate_hours, axis=1)
     jours_travaillés = df['Date'].nunique()
@@ -84,32 +100,33 @@ if input_text:
     total_nuit = df['Heures nuit'].sum()
     total_dimanche = df['Heures dimanche'].sum()
     total_renfort = df['Heures supp'].sum() - df[df['Notes du superviseur'].str.contains('renfort')]['Date'].nunique()
-    
+
     # Résultat global
     st.header("Résultat global")
     st.write(f"**Nombre de jours travaillés :** {jours_travaillés}")
     st.write(f"**Heures de jour :** {total_jour:.2f} h")
     st.write(f"**Heures de nuit :** {total_nuit:.2f} h")
     st.write(f"**Heures de dimanche :** {total_dimanche:.2f} h")
-    st.write(f"**Heures supplémentaires (renfort) :** {total_renfort :.2f} h")
-    st.write(f"**Total Heures calculés :** {total_jour + total_nuit + total_dimanche + total_renfort:.2f} h")
+    st.write(f"**Heures supplémentaires (renfort) :** {total_renfort:.2f} h")
+    st.write(f"**Total Heures calculées :** {total_jour + total_nuit + total_dimanche + total_renfort:.2f} h")
 
     # Notes du superviseur
     st.header("Notes du superviseur")
-    st.write(f"**Les notes des superviseurs :** {df[~df['Notes du superviseur'].isnull()][['Date','Notes du superviseur']]} ")
+    st.write(f"**Les notes des superviseurs :**")
+    st.dataframe(df[~df['Notes du superviseur'].isnull()][['Date','Notes du superviseur']])
 
     # Visualisation
     st.header("Visualisation")
     fig, ax = plt.subplots(figsize=(10, 5))
     df_viz = pd.DataFrame({
-        'Jour': [d.strftime("%d/%m") for d in df['Date']],
+        'Date': [d.strftime("%d/%m") for d in df['Date']],
         'Jour': df['Heures jour'],
         'Nuit': df['Heures nuit'],
         'Dimanche': df['Heures dimanche'],
         'Renfort': df['Heures supp'],
     })
 
-    df_viz.set_index('Jour').plot(kind='bar', stacked=True, ax=ax)
+    df_viz.set_index('Date').plot(kind='bar', stacked=True, ax=ax)
     plt.ylabel("Heures")
     plt.title("Répartition des heures par jour")
     st.pyplot(fig)
@@ -117,4 +134,3 @@ if input_text:
     # Détails 
     st.header("Détail de Calcul par ligne")
     st.dataframe(df[['Date', 'Heures jour', 'Heures nuit', 'Heures dimanche', 'Heures supp']])
-
