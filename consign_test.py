@@ -53,10 +53,15 @@ if input_text:
         # Supplémentaires dans les notes
         supplements = {
             '+0.5h': 0.5,
+            '+0.75h': 0.75,
             '+1h': 1.0,
+            '+1.25h': 1.25,
             '+1.5h': 1.5,
+            '+1.75h': 1.75,
             '+2h': 2.0,
+            '+2.25h': 2.25,
             '+2.5h': 2.5,
+            '+3h': 3
         }
 
         current = start
