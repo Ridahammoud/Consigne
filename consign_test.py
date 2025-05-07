@@ -84,6 +84,7 @@ if input_text:
         # Déduction pause sur les heures de jour
         pause = row['Pause non payée']
         heures_jour = max(0, heures_jour - pause)
+        heures_ferie = max(0, heures_ferie - pause)
 
         heures_supp = 0
         for key, value in supplements.items():
