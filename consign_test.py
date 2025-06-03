@@ -35,6 +35,8 @@ if input_text:
         datetime(2025, 1, 1).date(),
         datetime(2025, 4, 21).date(),
         datetime(2025, 5, 1).date(),
+        datetime(2025, 5, 8).date(),
+        datetime(2025, 5, 29).date(),
         datetime(2025, 7, 5).date(),
         datetime(2025, 11, 1).date(),
         # Ajouter d'autres jours fériés ici
