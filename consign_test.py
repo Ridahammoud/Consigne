@@ -67,6 +67,7 @@ if input_text:
         }
 
         current = start
+        ferie_premiere_date = date in holidays
         while current < end:
             next_minute = current + timedelta(minutes=1)
             hour = current.hour + current.minute / 60
@@ -85,9 +86,10 @@ if input_text:
 
         # Déduction pause sur les heures de jour
         pause = row['Pause non payée']
-        heures_jour = max(0, heures_jour - pause)
-        heures_ferie = max(0, heures_ferie - pause)
-
+        if ferie_premiere_date:
+            heures_ferie = max(0, heures_ferie - pause)
+        else:
+            heures_jour = max(0, heures_jour - pause)
         heures_supp = 0
         for key, value in supplements.items():
             if key in row['Notes du superviseur']:
